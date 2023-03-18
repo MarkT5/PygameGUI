@@ -1,9 +1,9 @@
 import pygame as pg
+import threading as thr
 from .Sprites import *
 
 class Screen:
     def __init__(self, width, height, fps=60):
-        self.running = True
         self.objects = dict()
         self.objects_order = []
         self.raw_draw = dict()
@@ -26,6 +26,18 @@ class Screen:
         self.mouse_wheel_pos = 0
         self.mouse_pos = [0, 0]
         self.mouse_state = [0, 0]
+        self.initialized = False
+        self.in_separate_thread = False
+        self.force_stop = False
+
+    def lunch_separate_thread(self):
+        self.in_separate_thread=True
+        self.thread = thr.Thread(target=self.as_thread)
+        self.thread.start()
+
+    def as_thread(self):
+        self.init()
+        self.run()
 
     def __getitem__(self, item):
         if item in self.objects:
@@ -33,12 +45,13 @@ class Screen:
         else:
             raise AttributeError("No object named", item)
 
-    def add_fps_indicator(self, x=0, y=0, font=10):
-        self.sprite(Text, "fps", x=x, y=y, inp_text=self.get_fps, font='serif', font_size=font)
+    def add_fps_indicator(self, x=0, y=0, font=10, color=(255,255,255)):
+        self.sprite(Text, "fps", x=x, y=y, inp_text=self.get_fps, font='serif', font_size=font, color=color)
 
     def init(self):
         pg.init()
         self.screen = pg.display.set_mode((self.width, self.height))
+        self.initialized = True
 
     def step(self):
         if self.running:
@@ -52,13 +65,26 @@ class Screen:
             self.fps = self.clock.get_fps()
 
     def run(self):
+        i=0
         while self.running:
             self.step()
+            print('step', i)
+            i += 1
         pg.quit()
 
     def end(self):
         self.running = False
         pg.quit()
+
+    @property
+    def running(self):
+        if self.in_separate_thread:
+            return thr.main_thread().is_alive()
+        else:
+            return not self.force_stop
+    @running.setter
+    def running(self, val):
+        self.force_stop = val
 
     def get_fps(self):
         return round(self.fps, 2)
@@ -145,5 +171,7 @@ class Screen:
         self.raw_draw = dict()
 
     def sprite(self, sprite_type, name, **kwargs):
+        while not self.initialized:
+            pass
         self.add_object(sprite_type(self, name=name, **kwargs))
         return self.objects[name]
