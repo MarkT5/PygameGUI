@@ -2,6 +2,7 @@ import pygame as pg
 import threading as thr
 from .Sprites import *
 
+
 class Screen:
     def __init__(self, width, height, fps=60):
         self.objects = dict()
@@ -22,6 +23,7 @@ class Screen:
         self.process_btn_clk = 0
         self.pressed_obj = None
         self.released_obj = None
+        self.dragged_obj = None
         self.old_mouse_pos = [0, 0]
         self.mouse_wheel_pos = 0
         self.mouse_pos = [0, 0]
@@ -29,6 +31,8 @@ class Screen:
         self.initialized = False
         self.in_separate_thread = False
         self.force_stop = False
+        self.del_queue = []
+        self.cicle_finished = True
 
     def lunch_separate_thread(self):
         self.in_separate_thread=True
@@ -46,12 +50,14 @@ class Screen:
             raise AttributeError("No object named", item)
 
     def add_fps_indicator(self, x=0, y=0, font=10, color=(255,255,255)):
-        self.sprite(Text, "fps", x=x, y=y, inp_text=self.get_fps, font='serif', font_size=font, color=color)
+        Text(self, name="fps", x=x, y=y, inp_text=self.get_fps, font='serif', font_size=font, color=color)
+
 
     def init(self):
         pg.init()
         self.screen = pg.display.set_mode((self.width, self.height))
         self.initialized = True
+
 
     def step(self):
         if self.running:
@@ -63,18 +69,18 @@ class Screen:
             pg.display.flip()
             self.clock.tick(self.max_fps)
             self.fps = self.clock.get_fps()
+            self.post_processes()
+            self.cicle_finished = True
 
     def run(self):
-        i=0
         while self.running:
             self.step()
-            print('step', i)
-            i += 1
         pg.quit()
 
     def end(self):
         self.running = False
         pg.quit()
+
 
     @property
     def running(self):
@@ -85,6 +91,11 @@ class Screen:
     @running.setter
     def running(self, val):
         self.force_stop = val
+
+    def wait_step(self):
+        self.cicle_finished = False
+        while not self.cicle_finished:
+            pass
 
     def get_fps(self):
         return round(self.fps, 2)
@@ -128,8 +139,25 @@ class Screen:
 
 
     def add_object(self, obj):
+        if obj.name in self.objects:
+            raise ValueError("Duplicate object")
         self.objects[obj.name] = obj
         self.objects_order.append(obj.name)
+
+    def del_object(self, obj):
+        if isinstance(obj, str):
+            obj_name =obj
+        else:
+            obj_name =obj.name
+        self.del_queue.append(obj_name)
+
+    def post_processes(self):
+        if self.del_queue:
+            for i in self.del_queue:
+                del self.objects[i]
+                self.objects_order.pop(self.objects_order.index(i))
+            self.del_queue = []
+
 
     def add_raw(self, func, name, *args):
         self.raw_draw[name] = [func, args]
@@ -139,7 +167,6 @@ class Screen:
     def update_objects(self):
 
         if self.pressed_obj:
-            print(self.pressed_obj.name)
             pomop = self.pressed_obj.convert_to_local(self.mouse_pos)
             self.pressed_obj.pressed(mouse_pos=pomop, btn_id=self.mouse_state[0])
             self.pressed_obj = None
@@ -147,13 +174,17 @@ class Screen:
             pomop = self.released_obj.convert_to_local(self.mouse_pos)
             self.released_obj.release(mouse_pos=pomop, btn_id=self.mouse_state[0])
             self.released_obj = None
-        if self.curr_obj:
-            curr_obj_mouse_pos = self.curr_obj.convert_to_local(self.mouse_pos)
+        if self.dragged_obj:
+            curr_obj_mouse_pos = self.dragged_obj.convert_to_local(self.mouse_pos)
             if (self.mouse_delta[0] or self.mouse_delta[1]) and self.mouse_state[1]:
-                self.curr_obj.dragged(mouse_pos=curr_obj_mouse_pos,
+                self.dragged_obj.dragged(mouse_pos=curr_obj_mouse_pos,
                                       btn_id=self.mouse_state[0],
                                       mouse_delta=self.mouse_delta)
+        if self.curr_obj:
+            if (self.mouse_delta[0] or self.mouse_delta[1]) and self.mouse_state[1] and not self.dragged_obj:
+                self.dragged_obj = self.curr_obj
             else:
+                curr_obj_mouse_pos = self.curr_obj.convert_to_local(self.mouse_pos)
                 self.curr_obj.hover(mouse_pos=curr_obj_mouse_pos)
 
         for obj in self.objects_order:
@@ -165,13 +196,14 @@ class Screen:
             self.screen.blit(img, pos)
         self.blit_arr = []
         for obj_name in self.objects_order:
-            self.objects[obj_name].draw()
+            if self.objects[obj_name].visible:
+                self.objects[obj_name].draw()
         for func, args in self.raw_draw.values():
             func(self.screen, *args)
         self.raw_draw = dict()
 
-    def sprite(self, sprite_type, name, **kwargs):
+    def sprite(self, sprite_obj):
         while not self.initialized:
             pass
-        self.add_object(sprite_type(self, name=name, **kwargs))
-        return self.objects[name]
+        self.add_object(sprite_obj)
+        return self.objects[sprite_obj.name]
