@@ -24,6 +24,7 @@ class Sprite:
         self.func = func
         self.name = name
         self.par_surf = par_surf
+        self.par_surf.sprite(self)
         self.surface = self.par_surf.screen
         self.ps_width, self.ps_height = par_surf.width, par_surf.height
         self.x = int(x * self.ps_width)
@@ -34,6 +35,7 @@ class Sprite:
         self.color = color
         self.rect = pg.Rect(self.x, self.y, self.width, self.height)
         self.transparent_for_mouse = transparent_for_mouse
+        self.visible = True
 
     def pressed(self, *args, **kwargs):
         pass
