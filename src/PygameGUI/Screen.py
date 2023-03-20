@@ -136,6 +136,7 @@ class Screen:
             elif event.type == pg.MOUSEBUTTONUP:
                 self.mouse_state = [event.button, 0]
                 self.released_obj = self.curr_obj
+                self.dragged_obj = None
 
 
     def add_object(self, obj):
