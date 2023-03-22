@@ -33,6 +33,7 @@ class Screen:
         self.force_stop = False
         self.del_queue = []
         self.cicle_finished = True
+        self.pause_update = thr.Lock()
 
     def lunch_separate_thread(self):
         self.in_separate_thread=True
@@ -74,7 +75,9 @@ class Screen:
 
     def run(self):
         while self.running:
+            self.pause_update.acquire()
             self.step()
+            self.pause_update.release()
         pg.quit()
 
     def end(self):

@@ -15,6 +15,8 @@ class Mat(Sprite):
         self.is_mat_stream = False
         self.last_hover_pos = (0, 0)
         self.is_pressed = False
+        mat = self.cv_mat_stream()
+        self.scale_factor = [self.width / mat.shape[1], self.height / mat.shape[0]]
 
     def draw(self):
         mat = self.cv_mat_stream()
